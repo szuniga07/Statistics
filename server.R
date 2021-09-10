@@ -314,7 +314,12 @@ shinyServer(
     #Runs the function above
     modifiedTimeVarCrt <- reactive({
       if(input$ModAddTmYN == "Yes") {
-        fncTimeCrt(DF=modifiedDf1(),  X=input$Modify2VrTm )
+        if( !is.null(input$Modify2VrTm) ) {
+          fncTimeCrt(DF=modifiedDf1(),  X=input$Modify2VrTm )
+        } else {
+          #"No.Time.Var"= c(NA)
+          data.frame("No.Time.Var"= rep(NA, nrow(modifiedDf1())))
+        } 
       }
     })
     ## FUnction to create YYMM and Month variables ##
