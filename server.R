@@ -1283,19 +1283,27 @@ fpconf <- function(x, xlev, y, z, dataf, conf_lev, Increment) {
   return(agr_df=agr_df ) 
 }
 
-fconf <- function(x=xcivar, xlev=xlev, y=ycivar, z=zcivar, dataf, conf_lev=ciconf_lev, Increment, Fci_type) {
-  switch(Fci_type,                #"var" and can be used anywhere in server.r.
-         "Mean (t)" =  ftconf(x, xlev, y, z, dataf, conf_lev, Increment), 
-         "Proportion (binomial)" =  fbconf(x, xlev, y, z, dataf, conf_lev, Increment), 
-         "Poisson (exact)" =  fpconf(x, xlev, y, z, dataf, conf_lev, Increment) 
-  )
+fconf <- function(x=xcivar, xlev=xlev, y=ycivar, z=zcivar, dataf, conf_lev=ciconf_lev, 
+                  Increment, Fci_type, Aggr) {
+  if(Aggr== "Yes: Aggregated data only") {
+    agr_df <- data.frame(x_lev=df()[, x], z_lev=as.integer(c(df()[, z])), agr_m=df()[, y], agr_sd=0, agr_n=1)
+    adf_alpha <- data.frame(cbind(PointEst=agr_df$agr_m, Lower=0, Upper=0))
+    agr_df <- cbind(agr_df, adf_alpha)
+  } else {
+    switch(Fci_type,                #"var" and can be used anywhere in server.r.
+           "Mean (t)" =  ftconf(x, xlev, y, z, dataf, conf_lev, Increment), 
+           "Proportion (binomial)" =  fbconf(x, xlev, y, z, dataf, conf_lev, Increment), 
+           "Poisson (exact)" =  fpconf(x, xlev, y, z, dataf, conf_lev, Increment) 
+    )
+  }
 }
 
 #Reactive function that runs fconf above
 fcidf <- reactive({                  #This indicates the data frame I will use.
   if(input$FCiCreate == "Yes") {
     fconf(x=input$fxcivar, xlev=fci_plot_Group_Levels(), y=input$fycivar, z=input$fzcivar, 
-          dataf=df(), conf_lev=input$fciconf_lev, Increment=fci_Z_Increment(), Fci_type=input$fci_type)
+          dataf=df(), conf_lev=input$fciconf_lev, Increment=fci_Z_Increment(), 
+          Fci_type=input$fci_type, Aggr=fCi_straight_line() )
   }
 })
 
@@ -1702,7 +1710,6 @@ output$FCIx <- renderUI({                                 #Same idea as output$v
   selectInput("fxcivar", "2. Select the factor.", 
               choices = setdiff(var(), input$fycivar), multiple=FALSE, selected=var()[2])     #Will make choices based on my reactive function.
 })
-
 #Select the predictors.
 output$FCIz <- renderUI({                                 #Same idea as output$vy
   selectInput("fzcivar", "3. Select a time variable.", 
@@ -1769,7 +1776,7 @@ fci_plot_Line_Width <- reactive({
 
 #Select how many knots I want
 output$FCI_nk_knots <- renderUI({                                
-  numericInput("FciNkKnots", "11. Select the number of spline knots.",
+  numericInput("FciNkKnots", "12. Select the number of spline knots.",
                value = 3, min=3, max = 10, step = 1)
 })
 #Select whether to run the 95% confidence interval or not
@@ -1780,7 +1787,7 @@ output$FCi_create <- renderUI({
 })
 #Select whether to run the 95% confidence interval or not
 output$FCi_ovral_line <- renderUI({
-  selectInput("fciOvrLn", "12. Add the overall group line?",
+  selectInput("fciOvrLn", "13. Add the overall group line?",
               #              choices = c("No", "Yes"),
               choices = c("No", "Line", "Line with band"),
               selected="No")
@@ -1791,7 +1798,7 @@ fci_overall_line <- reactive({
 })
 #Add a target line
 output$FCi_Tgt_Line <- renderUI({                                 
-  textInput("fciTgtLn", "13. Add a target line.",
+  textInput("fciTgtLn", "14. Add a target line.",
             value = paste0('c( ', ')') )
 })
 #Reactive function for above
@@ -1800,10 +1807,9 @@ fCi_target_line <- reactive({
 })
 #Add a time point line
 output$FCi_Tm_Pt_Line <- renderUI({                                 
-  textInput("fciTmPtLn", "14. Add a time point line.",
+  textInput("fciTmPtLn", "15. Add a time point line.",
             value = paste0('c( ', ')'))
 })
-
 #Reactive function for above
 fCi_time_point_line <- reactive({ 
   input$fciTmPtLn  
@@ -1821,8 +1827,9 @@ range_fycivar <- reactive({
 
 #13. Indicate if you want a straight line
 output$FCi_strght_ln <- renderUI({                                
-  selectInput("fciStrtLn", "15. Use straight trend lines?",
-              choices = c("No", "Yes"),
+  selectInput("fciStrtLn", "21. Use straight trend lines?",
+              #              choices = c("No", "Yes"),
+              choices = c("No", "Yes", "Yes: Aggregated data only"),
               selected="No")
 })
 #13A. Reactive function for above
@@ -1831,7 +1838,7 @@ fCi_straight_line <- reactive({
 })
 #Select target and time line width
 output$fci_plot_TgtTpt_ln_wdth <- renderUI({                                 
-  numericInput("fciPlTgTpLnWd", "16. Select other line's width.", 
+  numericInput("fciPlTgTpLnWd", "11. Select other line's width.", 
                value = 2, min=0, step = 1)     
 })
 #Reactive function for directly above
@@ -1868,7 +1875,7 @@ fci_plot_Time_Point_Line_Colors <- reactive({
 })
 #21. Select the line label size
 output$fci_plot_txt_lbl_sz <- renderUI({                                 
-  numericInput("fciPlTxtLblSz", "21. Select the line label size.", 
+  numericInput("fciPlTxtLblSz", "16. Select the line label size.", 
                value = 2, min=0, step = .1)     
 })
 #Reactive function for directly above
@@ -1896,6 +1903,7 @@ output$FCI__Ylim2 <- renderUI({
   numericInput("fCiYLim2", "25. Upper Y-axis limit.",
                value = range_fycivar()[2], step = .1)
 })
+
 #Confidence interval plot for time
 output$Plot_Fci_output <- renderPlot({ 
   if(input$FCiCreate == "Yes") {
