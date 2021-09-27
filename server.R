@@ -1,23 +1,10 @@
 #Install these packages to run this Shiny App
 #install.packages("shiny")
-#install.packages("jsonlite")
 #install.packages("rms") 
-#install.packages("nlme")
-#install.packages("lm.beta")
-#install.packages("sensitivity")
-#install.packages("meta")
-#install.packages("rpart")
-#install.packages("coxme")
- 
+
 library(shiny)
-#library(jsonlite)
 library(rms)
-#library(nlme)
-#library(lm.beta)
-#library(sensitivity)
-#library(meta)
-#library(rpart)
-#library(coxme)
+
 #Surival package data: cancer colon diabetic flchain heart mgus nafld1 pbc transplant   
 #data(lungcancer)
 options(shiny.maxRequestSize=1000*1024^2)    #This will increase the shiny file upload limit from current 5MB max
@@ -2132,7 +2119,7 @@ fncSctrPlt <- function(DF, X, Y, sct_plt_clr, CT) {
                                                  " (correlation= ", round(as.numeric(CT["estimate"]), 3), 
                                                  ", ", "p-value= ", try(round(as.numeric(CT["p.value"]), 4)), ")"),
                  xlab=X, ylab=Y,
-                 lpars =list(col = "red", lwd = 3, lty = 3))
+                 lpars =list(col = sct_plt_clr, lwd = 5, lty = 3))
 }
 
 ##########################################################################
