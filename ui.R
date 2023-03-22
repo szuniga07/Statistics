@@ -182,12 +182,13 @@ tabPanel("Describe",
          ),
          plotOutput("DescSmryPlt", height = 800, width = 1200), 
          ## scatter plot with correlation ## 
-         h4("Scatterplot with a lowess smoothed line and a correlation test."),
+         h4("Scatterplot with a loess smoothed line, OLS regression line, and a correlation test."),
          br(),
          h5("Method indicates which correlation coefficient is used for the test."),
          h5("'pearson'= both continuous variables; 'kendall' tau= continuous, ordinal, and binary scales. 'spearman' rho= continuous, ordinal, and binary scales; nonparametric method will detect not only non-linear relationships but non-monotonic ones."),
          h5("Exact indicates whether an exact p-value should be computed. Used for 'kendall' and 'spearman'. Default is to leave #7 blank."),
          h5("Continuity correction used for 'kendall' and 'spearman' when not computed exactly."),
+         h5("When adding a regression line, the intercept and slope estimates are added to the title. The p-value is idential to a Pearson correlation. Pearson R^2 is the proportion of variance in Y explained by X."),
          br(),
          fluidRow(   
            column(3, 
@@ -209,7 +210,13 @@ tabPanel("Describe",
            column(3, 
                   uiOutput("scatter_cor_test_cnt")),
            column(3, offset=1,
-                  uiOutput("sctr_crtst_clr")),
+                  uiOutput("scatter_cor_regression_add_YN")),
+           column(3, offset=1,
+                  uiOutput("sctr_crtst_clr"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("scatter_cor_lgd_loc")),
            column(3, offset=1,
                   uiOutput("scatter_cor_test_run_YN"))
          ),
@@ -251,20 +258,29 @@ tabPanel("Describe",
            column(3, 
                   uiOutput("dnsty_grp_trnd_Xvar")),
            column(3, 
-                  uiOutput("dnsty_grp_trnd_Xlevs")),
+                  uiOutput("dnsty_grp_bgn_yesno")),
            column(3, 
-                  uiOutput("dnsty_grp_trnd_Zvar"))
+                  uiOutput("dnsty_grp_trnd_Xlevs"))
          ),
          fluidRow(   
+           column(3, 
+                  uiOutput("dnsty_grp_trnd_Zvar")),
            column(3, 
                   uiOutput("dnsty_grp_trnd_Z_inc")),
            column(3, 
                   uiOutput("dnsty_grp_trnd_ln_clr")),
            column(3, 
+                  uiOutput("dns_plot_lbl_clrs"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("dns_plot_txt_lbl_sz")),
+           column(3, 
                   uiOutput("dnsty_grp_trnd_trgt")),
            column(3, 
                   uiOutput("dnsty_grp_trnd_lgd_loc"))
          ),
+         
          fluidRow(   
            column(3, 
                   uiOutput("dnsty_grp_trnd_st_sed")),
@@ -311,12 +327,133 @@ tabPanel("Describe",
          plotOutput("naPlt", height = 700), 
          br()
 ),    
+###
+tabPanel("95% CIs",
+         h4("This plot produces unadjusted confidence intervals for each level of a factor."),
+         fluidRow(   
+           column(3, 
+                  uiOutput("CIy")),
+           column(3, offset=1,
+                  uiOutput("CIx")),
+           column(3, offset=1,
+                  uiOutput("Ci_Choice_Type")),
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("Ci_Conf_Lev")),
+           column(3, offset=1,
+                  uiOutput("Ci_Tgt_Line")),
+           column(3, offset=1,
+                  uiOutput("Ci_create"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("ci_plot_ln_clrs")),
+           column(3, offset=1,
+                  uiOutput("ci_plot_pt_clrs")),
+           column(3, offset=1,
+                  uiOutput("Ci_Alpha_Num"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("Ci_create_tot_bar")),
+           column(3, offset=1,
+                  uiOutput("ci_plot_tot_bar_clrs")),
+           column(3, offset=1,
+                  uiOutput("ci_plot_lab_multi"))
+         ),
+         plotOutput("Plot_Ci_output", height = 800, width="100%"),
+         h6("Note: You can sort alphabetically by the factor level name or numerically by the point estimate. Left side = factor level, right side = point estimate."),
+         verbatimTextOutput("Cidf_output"),
+         h6("Note: The values above are point estimates and confidence limits that are sorted alphabetically and numerically. Poisson group and pairwise comparisons assume normal approximation."),
+         br(),
+         h4("Performance of groups over time (need >= 6 time points for spline knots, use 'straight trend lines' when < 6)"),
+         h5("This plot has straight or smoothed spline trajectories, with or without confidence bands. Smoothed \"trend\" lines may not have cooridnate values that equal rates."),
+         br(),
+         fluidRow(   
+           column(3, 
+                  uiOutput("FCIy")),
+           column(3, 
+                  uiOutput("FCIx")),
+           column(3, 
+                  uiOutput("FCIz")),
+           column(3, 
+                  uiOutput("FCIzInc"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("fciplot_grp_levs")),
+           column(3, 
+                  uiOutput("FCi_Choice_Type")),
+           column(3, 
+                  uiOutput("FCi_Conf_Lev")),
+           column(3, 
+                  uiOutput("FCI_bands"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("fci_plot_ln_clrs")),
+           column(3, 
+                  uiOutput("fci_plot_ln_typ")),
+           column(3, 
+                  uiOutput("fci_plot_ln_wdth")),
+           column(3, 
+                  uiOutput("fci_plot_TgtTpt_ln_wdth"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("FCi_ovral_line")),
+           column(3, 
+                  uiOutput("FCi_Tgt_Line")),
+           column(3, 
+                  uiOutput("FCi_Tm_Pt_Line")),
+           column(3, 
+                  uiOutput("fci_plot_txt_lbl_sz"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("fci_plot_ovral_ln_clrs")),
+           column(3, 
+                  uiOutput("fci_plot_tgt_ln_clrs")),
+           column(3, 
+                  uiOutput("fci_plot_time_pt_ln_clrs")),
+           column(3, 
+                  uiOutput("FCi_create"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("FCi_strght_ln")),
+           column(3, 
+                  uiOutput("FCI_nk_knots")),
+           column(3, 
+                  uiOutput("FCI_plot_lab_multi"))
+         ),
+         fluidRow(   
+           column(3, 
+                  uiOutput("FCI__Xlim1")),
+           column(3, 
+                  uiOutput("FCI__Xlim2")),
+           column(3, 
+                  uiOutput("FCI__Ylim1")),
+           column(3, 
+                  uiOutput("FCI__Ylim2"))
+         ),
+         
+         h5("Modify the plot space in #24-27. Enter values into 'c()' for #13 and #14 when needed, separate values with ',' (e.g., c(1, 2) ). For single time point data, use 'Yes: Aggregated data only' in #21."),
+         h5("Note: The colors of the lines are assigned according to the group order of the 'point estimate and confidence interval' output below."),
+         br(),
+         plotOutput("Plot_Fci_output", height = 800, width="100%"),
+         h5("These are point estimates and confidence intervals. These may not match up with smoothed lines. x_lev and z_lev match with #2 and #3 above."),
+         tableOutput("time_ci_out1"),
+         h5("Overall rates. Uses all data and used for the 'overall group trend line'."),
+         tableOutput("all_time_ci_out1")
+),
 
 ################################################################################
 #                       Power analysis                                         #
 ################################################################################
 
-tabPanel("Power" ,
+tabPanel("Test" ,
          h4("One- and two-sample binomial proportion tests or a one- and two-sample and paired t-tests"),
          h5("One-sample tests compare data with a hypothetical value (e.g., heads from a coin toss vs. 0.50 rate). Two-sample tests compare independent groups (e.g., group 1's age vs. group 2's age). Paired t-test compares dependent samples (e.g., patient's blood pressure time 1 vs time 2)."),
          br(),
@@ -436,116 +573,8 @@ tabPanel("Power" ,
          h5("Effect sizes are standardized values that represent the magnitude of differences between the groups."),
          h5("Binary outcomes: Values of 0.20, 0.50, and 0.80 represent small, medium, and large effects (Cohen, 1988)."),
          h5("Continuous outcomes: Values of 0.20, 0.50, and 0.80 represent small, medium, and large effects. Consult Cohen, 1988, about paired t-tests.")
-), 
-
-###
-tabPanel("95% CIs",
-         h4("This plot produces unadjusted confidence intervals for each level of a factor."),
-         fluidRow(   
-           column(3, 
-                  uiOutput("CIy")),
-           column(3, offset=1,
-                  uiOutput("CIx")),
-           column(3, offset=1,
-                  uiOutput("Ci_Choice_Type")),
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("Ci_Conf_Lev")),
-           column(3, offset=1,
-                  uiOutput("Ci_Tgt_Line")),
-           column(3, offset=1,
-                  uiOutput("Ci_create"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("ci_plot_ln_clrs")),
-           column(3, offset=1,
-                  uiOutput("ci_plot_pt_clrs")),
-           column(3, offset=1,
-                  uiOutput("Ci_Alpha_Num"))
-         ),
-         plotOutput("Plot_Ci_output", height = 800, width="100%"),
-         h6("Note: You can sort alphabetically by the factor level name or numerically by the point estimate. Left side = factor level, right side = point estimate."),
-         verbatimTextOutput("Cidf_output"),
-         h6("Note: The values above are point estimates and confidence limits that are sorted alphabetically and numerically. Poisson group and pairwise comparisons assume normal approximation."),
-         br(),
-         h4("Performance of groups over time (need >= 6 time points for spline knots, use 'straight trend lines' when < 6)"),
-         h5("This plot has straight or smoothed spline trajectories, with or without confidence bands. Smoothed \"trend\" lines may not have cooridnate values that equal rates."),
-         br(),
-         fluidRow(   
-           column(3, 
-                  uiOutput("FCIy")),
-           column(3, 
-                  uiOutput("FCIx")),
-           column(3, 
-                  uiOutput("FCIz")),
-           column(3, 
-                  uiOutput("FCIzInc"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("fciplot_grp_levs")),
-           column(3, 
-                  uiOutput("FCi_Choice_Type")),
-           column(3, 
-                  uiOutput("FCi_Conf_Lev")),
-           column(3, 
-                  uiOutput("FCI_bands"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("fci_plot_ln_clrs")),
-           column(3, 
-                  uiOutput("fci_plot_ln_wdth")),
-           column(3, 
-                  uiOutput("fci_plot_TgtTpt_ln_wdth")),
-           column(3, 
-                  uiOutput("FCI_nk_knots")),
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("FCi_ovral_line")),
-           column(3, 
-                  uiOutput("FCi_Tgt_Line")),
-           column(3, 
-                  uiOutput("FCi_Tm_Pt_Line")),
-           column(3, 
-                  uiOutput("fci_plot_txt_lbl_sz"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("fci_plot_ovral_ln_clrs")),
-           column(3, 
-                  uiOutput("fci_plot_tgt_ln_clrs")),
-           column(3, 
-                  uiOutput("fci_plot_time_pt_ln_clrs")),
-           column(3, 
-                  uiOutput("FCi_create"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("FCi_strght_ln"))
-         ),
-         fluidRow(   
-           column(3, 
-                  uiOutput("FCI__Xlim1")),
-           column(3, 
-                  uiOutput("FCI__Xlim2")),
-           column(3, 
-                  uiOutput("FCI__Ylim1")),
-           column(3, 
-                  uiOutput("FCI__Ylim2"))
-         ),  
-         h5("Modify the plot space in #22-25. Enter values into 'c()' for #13 and #14 when needed, separate values with ',' (e.g., c(1, 2) ). For single time point data, use 'Yes: Aggregated data only' in #21."),
-         h5("Note: The colors of the lines are assigned according to the group order of the 'point estimate and confidence interval' output below."),
-         br(),
-         plotOutput("Plot_Fci_output", height = 800, width="100%"),
-         h5("These are point estimates and confidence intervals. These may not match up with smoothed lines. x_lev and z_lev match with #2 and #3 above."),
-         tableOutput("time_ci_out1"),
-         h5("Overall rates. Uses all data and used for the 'overall group trend line'."),
-         tableOutput("all_time_ci_out1")
 )
+
 ###
    
 

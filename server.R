@@ -112,11 +112,13 @@ shinyServer(
     output$modify_time_format <- renderUI({  
       selectInput("ModifyTimeFmt", "5. Choose the correct time format.", 
                   choices = c("31JAN2021", "31JAN21","31-JAN-2021","31-JAN-21","01/31/2021", "01/31/21", 
-                              "01-31-2021", "01-31-21", "2021-01-31", "21-01-31", #"1/31/2021 21:15",
-                              "1/31/2021 21:15 as 1/31/2021", #"1/31/2021 21:15:30",
-                              "1/31/2021 21:15:30 as 1/31/2021", #"1/31/2021 12:00:00 AM", 
-                              "1/31/2021 12:00:00 AM as 1/31/2021", "31JAN2021:12:00:00 as 31JAN2021",
-                              "44227 in Excel"), 
+                              "01-31-2021", "01-31-21", "2021-01-31", "21-01-31", 
+                              "1/31/2021 21:15 as 1/31/2021", "1/31/2021 21:15:30 as 1/31/2021", 
+                              "1/31/2021 12:00:00 AM as 1/31/2021", 
+                              "2021-01-31 21:15:30 as 2021-01-31",
+                              "31JAN2021:12:00:00 as 31JAN2021",
+                              "JAN2021", "JAN21","JAN-2021","JAN-21","01/2021", "01/21",
+                              "01-2021", "01-21", "2021-01", "21-01", "44227 in Excel"), 
                   multiple=TRUE, selected="01-31-2021")
     })
     #6. Number of replications per format used
@@ -954,74 +956,86 @@ fncCnfPstHc <- function(X, Y, DF, ci_type) {
 #Continuous outcomes
 tconf <- function(x, y, dataf, conf_lev) {
   #Aggregates outcome by factor 
-  #agr_m <- aggregate(dataf[, y] ~ dataf[, x], FUN="mean", data= dataf)
-  #agr_sd <- aggregate(dataf[, y] ~ dataf[, x], FUN="sd", data= dataf)
-  #agr_n <- aggregate(dataf[, y] ~ dataf[, x], FUN="length", data= dataf)
+  all_m <- mean(dataf[, y], na.rm=T)
+  all_sd <- sd(dataf[, y], na.rm=T)
+  all_n <- length(na.omit(dataf[, y]))
+  #By each X level
   agr_m <- aggregate(dataf[, y], list(dataf[, x]), FUN="mean", na.rm=T)
   agr_sd <- aggregate(dataf[, y], list(dataf[, x]), FUN="sd", na.rm=T)
-  agr_n <- aggregate(dataf[, y], list(dataf[, x]), FUN="length")
+  agr_n <- aggregate(dataf[ complete.cases(dataf[, y]) , y], list(dataf[ complete.cases(dataf[, y]) , x]), FUN="length")
   agr_df <- data.frame(x_lev=agr_m[, 1], agr_m=agr_m[, 2], agr_sd=agr_sd[, 2], agr_n=agr_n[, 2])
   
-  #Calculates confidence intervals
+  #Calculates confidence intervals--Overall
+  all_MOE <- qt((conf_lev/2)+.5, df=all_n - 1) * all_sd/sqrt(all_n)
+  all_Lower <- all_m - all_MOE
+  all_Upper <- all_m + all_MOE
+  adf_all <- data.frame(cbind(PointEst=all_m, Lower=all_Lower, Upper=all_Upper))
+  #Calculates confidence intervals--By Level
   MOE <- qt((conf_lev/2)+.5, df=agr_df$agr_n - 1) * agr_df$agr_sd/sqrt(agr_df$agr_n)
   Lower <- agr_df$agr_m - MOE
   Upper <- agr_df$agr_m + MOE
   adf_alpha <- data.frame(cbind(PointEst=agr_df$agr_m, Lower=Lower, Upper=Upper))
   rownames(adf_alpha) <- agr_df$x_lev
-#  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
+  #  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
   alpha_o <- order(agr_df$x_lev, decreasing = T) 
   adf_alpha <- adf_alpha[alpha_o, ] 
   adf_o <- order(adf_alpha[, "PointEst"], decreasing = T) 
   adf_numeric <- adf_alpha[adf_o, ] 
-  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric) ) 
+  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric, adf_all= adf_all) ) 
 }
 
 ##############
-
 #Binary outcomes
 bconf <- function(x, y, dataf, conf_lev) {
   #Aggregates outcome by factor 
-#  agr_sum <- aggregate(dataf[, y] ~ dataf[, x], FUN="sum", data= dataf)
-#  agr_n <- aggregate(dataf[, y] ~ dataf[, x], FUN="length", data= dataf)
+  #  agr_sum <- aggregate(dataf[, y] ~ dataf[, x], FUN="sum", data= dataf)
+  #  agr_n <- aggregate(dataf[, y] ~ dataf[, x], FUN="length", data= dataf)
   agr_sum <- aggregate(dataf[, y], list(dataf[, x]),  FUN="sum", na.rm=T)
   agr_n <- aggregate(dataf[, y], list(dataf[, x]), FUN="length")
   agr_df <- data.frame(x_lev=agr_sum[, 1], agr_sum=agr_sum[, 2], agr_n=agr_n[, 2])
   #Calculates confidence intervals
   adf_alpha <- binconf(x=agr_df[,2], n=agr_df[,3], alpha=1 - conf_lev)
   adf_alpha <- data.frame(adf_alpha)
+  
+  adf_all <- binconf(x=sum(agr_df[,2], na.rm=TRUE), n=sum(agr_df[,3], na.rm=TRUE), alpha=1 - conf_lev)
+  
   rownames(adf_alpha) <- agr_df$x_lev
-#  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
+  #  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
   alpha_o <- order(agr_df$x_lev, decreasing = T) 
   adf_alpha <- adf_alpha[alpha_o, ] 
   adf_o <- order(adf_alpha[, "PointEst"], decreasing = T) 
   adf_numeric <- adf_alpha[adf_o, ] 
-  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric) ) 
+  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric, adf_all=adf_all) ) 
 }
 
 ##############
 
 #Exact Poisson
 pconf <- function(x, y, dataf, conf_lev) {
+  #Aggregate outcomes for all
+  all_sum <- sum(dataf[, y], na.rm=T)
+  all_n <- length(na.omit(dataf[, y]))
+  adf_all <- unlist(poisson.test(x=all_sum, T=all_n, conf.level= conf_lev)[c("estimate","conf.int")])
+  adf_all <- data.frame(matrix(adf_all, ncol=3))
+  colnames(adf_all) <- c("PointEst", "Lower", "Upper")
   #Aggregates outcome by factor 
-#  agr_sum <- aggregate(dataf[, y] ~ dataf[, x], FUN="sum", data= dataf)
-#  agr_n <- aggregate(dataf[, y] ~ dataf[, x], FUN="length", data= dataf)
   agr_sum <- aggregate(dataf[, y], list(dataf[, x]), FUN="sum", na.rm=T)
   agr_n <- aggregate(dataf[, y], list(dataf[, x]), FUN="length")
   agr_df <- data.frame(x_lev=agr_sum[, 1], agr_sum=agr_sum[, 2], agr_n=agr_n[, 2])
   #Calculates confidence intervals
   adf_alpha <- matrix(ncol= 3, nrow= nrow(agr_df), byrow = TRUE)
   for (i in 1:nrow(agr_df)) {
-    adf_alpha[i, ] <- unlist(poisson.test(x=agr_df[i,2], T=agr_df[i,3], conf.level= .95)[c("estimate","conf.int")])
+    adf_alpha[i, ] <- unlist(poisson.test(x=agr_df[i,2], T=agr_df[i,3], conf.level= conf_lev)[c("estimate","conf.int")])
   }
   adf_alpha <- data.frame(adf_alpha)
   colnames(adf_alpha) <- c("PointEst", "Lower", "Upper")
   rownames(adf_alpha) <- agr_df$x_lev
-#  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
+  #  alpha_o <- order(rownames(adf_alpha), decreasing = T) 
   alpha_o <- order(agr_df$x_lev, decreasing = T) 
   adf_alpha <- adf_alpha[alpha_o, ] 
   adf_o <- order(adf_alpha[, "PointEst"], decreasing = T) 
   adf_numeric <- adf_alpha[adf_o, ] 
-  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric) ) 
+  return(list(adf_alpha=adf_alpha, adf_numeric=adf_numeric, adf_all=adf_all) ) 
 }
 
 conf <- function(x=xcivar, y=ycivar, dataf=df(), conf_lev=ciconf_lev) {
@@ -1036,7 +1050,7 @@ conf <- function(x=xcivar, y=ycivar, dataf=df(), conf_lev=ciconf_lev) {
 #Point estimates and confidence intervals reactive function
 cidf <- reactive({                  #This indicates the data frame I will use.
   if(input$CiCreate == "Yes") {
-   conf(x=input$xcivar, y=input$ycivar, dataf=df(), conf_lev=input$ciconf_lev)
+    conf(x=input$xcivar, y=input$ycivar, dataf=df(), conf_lev=input$ciconf_lev)
   }
 })
 #Use this for putting the output in the correct order
@@ -1048,7 +1062,7 @@ cidf <- reactive({                  #This indicates the data frame I will use.
 ##########################################
 # Plot function for confidence intervals #
 ##########################################
-plot_ci_fnc <- function(xcivar, ycivar, ydf, cidf, ciconf_lev, alpha_num, Lcol, Pcol, tgt) {
+plot_ci_fnc <- function(xcivar, ycivar, ydf, cidf, ciconf_lev, alpha_num, Lcol, Pcol, tgt, Cbar, plyCol, labMulti=1) {
   if (alpha_num=="Alphabetical") {
     adf <- cidf$adf_alpha
   }
@@ -1060,29 +1074,43 @@ plot_ci_fnc <- function(xcivar, ycivar, ydf, cidf, ciconf_lev, alpha_num, Lcol, 
   rng <- seq(min(adf), max(adf),length.out=nrow(adf))
   par(mar=c(5,7,4,4))
   plot(rng, 1:nrow(adf), type="n", ylab="", 
-       xlab= paste0("Value (the grey vertical line is the overall mean of ", round(mainYmn, 3), ")"),
-       main=main_ttl, axes=F ) 
-    for (i in 1:nrow(adf)) {
+       xlab= paste0("Value (grey vertical line = overall mean of ", round(mainYmn, 3), ", ", ciconf_lev * 100, "% ", "CI",
+                    " [", round(cidf[["adf_all"]][,"Lower"], 3), " ,", round(cidf[["adf_all"]][,"Upper"], 3),"]",")"),
+       #main=main_ttl, 
+       axes=F,  cex.lab=1*labMulti)
+  title(main_ttl, cex.main = 1*labMulti) 
+  for (i in 1:nrow(adf)) {
     lines(c(adf[,'Lower'][i], adf[,'Upper'][i]), c(i,i), lwd=4, col=Lcol) 
-    points(adf[,'PointEst'][i],i, pch=24, col=Pcol, lwd=1, bg=Pcol, cex=1.75) 
-    }
+    points(adf[,'PointEst'][i],i, pch=24, col=Pcol, lwd=1, bg=Pcol, cex=1.75*labMulti) 
+  }
   #Mean line
   abline(v=mainYmn, lwd=3, col="grey", lty=3)
   #Target line
   abline(v=tgt, lwd=3, col="green", lty=1)
   axis(1) 
-  axis(2,at=1:nrow(adf),labels=substr(rownames(adf), 1, 10), las=1, cex.axis=1)
-#  axis(2,at=1:nrow(adf),labels=rownames(adf), las=1, cex.axis=1)
-  axis(4,at=1:nrow(adf),labels=round(adf[, "PointEst"],2), las=1, cex.axis=1)
+  axis(2,at=1:nrow(adf),labels=substr(rownames(adf), 1, 10), las=1, cex.axis=1*labMulti )
+  #  axis(2,at=1:nrow(adf),labels=rownames(adf), las=1, cex.axis=1)
+  axis(4,at=1:nrow(adf),labels=round(adf[, "PointEst"],2), las=1, cex.axis= 1*labMulti*.75 )
+  
+  ## Add confidence bar ##
+  #Create x and y data
+  cidf[["adf_all"]][,"Lower"]
+  Cbar_x <- c(rep(cidf[["adf_all"]][,"Lower"], nrow(adf)), rep(cidf[["adf_all"]][,"Upper"], nrow(adf)))
+  Cbar_y <- c(1:nrow(adf), nrow(adf):1)
+  #Create shading
+  if(Cbar=="Yes") {
+    polygon(Cbar_x, Cbar_y, col = adjustcolor(plyCol, alpha.f = 0.4), border= plyCol )
+  }
   box()
 }
 
 #Confidence interval plot reactive function
 plot_ci <- reactive({                  #This indicates the data frame I will use.
   if(input$CiCreate == "Yes") {
-  plot_ci_fnc(xcivar=input$xcivar, ycivar=input$ycivar, ydf=df(), cidf=cidf(), 
-              ciconf_lev=input$ciconf_lev, alpha_num=input$alpha_num, 
-              Lcol=ci_plot_Line_Colors() , Pcol=ci_plot_Point_Colors(), tgt=ci_target_line() )
+    plot_ci_fnc(xcivar=input$xcivar, ycivar=input$ycivar, ydf=df(), cidf=cidf(), 
+                ciconf_lev=input$ciconf_lev, alpha_num=input$alpha_num, Lcol=ci_plot_Line_Colors(), 
+                Pcol=ci_plot_Point_Colors(), tgt=ci_target_line(), Cbar= Ci_create_total_bar_interval(), 
+                plyCol= ci_plot_Total_Bar_Colors(), labMulti=ci_plot_label_multiplier() )
   }
 })
 
@@ -1133,9 +1161,9 @@ output$Ci_Alpha_Num <- renderUI({                                #Creates a UI f
 #Confidence interval plot
 output$Plot_Ci_output <- renderPlot({ 
   if(input$CiCreate == "Yes") {
-  plot_ci()
+    plot_ci()
   }
-  }, height = 700)
+}, height = 700)
 
 #Confidence interval values
 output$Cidf_output <- renderPrint({ 
@@ -1172,6 +1200,35 @@ output$ci_plot_pt_clrs <- renderUI({
 ci_plot_Point_Colors <- reactive({                 
   input$ciPltPtClr 
 })
+#Select whether to run the 95% confidence interval or not
+output$Ci_create_tot_bar <- renderUI({                                #Creates a UI function here but it will
+  selectInput("CiCreateTotBar", "10. Create overall Conf. Int. band?",
+              choices = c("No", "Yes"),
+              selected="No")
+})
+#Reactive function for directly above
+Ci_create_total_bar_interval <- reactive({                 
+  input$CiCreateTotBar 
+})
+
+#Select line colors
+output$ci_plot_tot_bar_clrs <- renderUI({                                 
+  selectInput("ciPltTotBarClr", "11. Select overall band color.", 
+              choices = xyplot_Line_Color_Names(), multiple=FALSE, selected= "gray")     
+})
+#Reactive function for directly above
+ci_plot_Total_Bar_Colors <- reactive({                 
+  input$ciPltTotBarClr 
+})
+#Select line colors
+output$ci_plot_lab_multi <- renderUI({                                 
+  numericInput("ciPltLabMlt", "12. Increase label sizes.",
+               value = 1, min=.01, step = .1)
+})
+#Reactive function for directly above
+ci_plot_label_multiplier <- reactive({                 
+  input$ciPltLabMlt 
+})
 
 ## Reactive function to do group tests ##
 conf_group_test <- reactive({                  #This indicates the data frame I will use.
@@ -1186,6 +1243,7 @@ conf_post_hoc <- reactive({                  #This indicates the data frame I wi
     fncCnfPstHc(X=input$xcivar, Y=input$ycivar, DF=df(), ci_type= input$ci_type)
   }
 })
+
 
 #######################################
 # Graphs for trajectories by time     #
@@ -1544,22 +1602,37 @@ plot_fci_fnc <- function(x, y, z, xcivar, ycivar, zcivar, dataf, LCol, LWd, Fci.
                          cibands, fCiXLim1, fCiXLim2, fCiYLim1, fCiYLim2, Tot.Line, FCI.Tot,
                          FCI.Tot.Straight, Conf.Intrv, Tgt.Line, Straight.Line, Time.Pt.Line,
                          ci_p_tot, ci_l_tot, ci_u_tot, Tot.Color, Tgt.Color, Tpt.Color, 
-                         T3.Line.Width, Text.Size) {
+                         T3.Line.Width, Text.Size, LType, labMulti=1) {
   #Make text out of the confidence level
   ConINT <- paste0(as.character(Conf.Intrv*100), "%")
   #Main title
   if(cibands == "Yes") {
-    Main.Title <- paste0( ycivar, " trajectories of ", xcivar,  " by ", zcivar, " with ", ConINT, " confidence bands")
+    Main.Title <- paste0( ycivar, " trajectories per ", xcivar,  " by ", zcivar, " with ", ConINT, " confidence bands")
   } else {
-    Main.Title <- paste0( ycivar, " trajectories of ", xcivar,  " by ", zcivar)
+    Main.Title <- paste0( ycivar, " trajectories per ", xcivar,  " by ", zcivar)
   }
-  
+  #Line Type
+  if(is.null( eval(parse(text=LType )) )) {
+    line_type <- 1:length(ctrs)
+  } else {
+    #line_type <- LType
+    line_type <- as.numeric(eval(parse(text=LType )))
+  }
   #Set up colors
   my_clr <- LCol
-  plot(unique(dataf[, z]), seq(min(min_ci, na.rm=T), max(max_ci, na.rm=T), length.out=length(unique(dataf[, z]))), type="n",  
-       cex.lab=1.35,cex.main=1.35,cex.sub=1.35, 
-       ylab=ycivar, xlab=zcivar, xlim=c(fCiXLim1, fCiXLim2), ylim=c(fCiYLim1, fCiYLim2),
-       main= Main.Title )
+  par(mar = c(6, 6, 3, 1) + 0.1)
+  plot(unique(dataf[, z]), seq(min(min_ci, na.rm=T), max(max_ci, na.rm=T), 
+                               length.out=length(unique(dataf[, z]))), type="n",  
+       #cex.lab=1*labMulti, cex.main=1.35, cex.sub=1*labMulti, 
+       axes=F, ylab="", xlab="", 
+       xlim=c(fCiXLim1, fCiXLim2), ylim=c(fCiYLim1, fCiYLim2)
+  )
+  title(Main.Title, cex.main = 1.1*labMulti) 
+  axis(1, las=1, cex.axis=1*labMulti )
+  axis(2, las=3, cex.axis=1*labMulti )
+  mtext(zcivar, side = 1, line = 4, cex=1.1*labMulti )
+  mtext(ycivar, side = 2, line = 4, cex=1.1*labMulti )
+  box()
   #Plot point estimate lines
   ci_time <- list() 
   l95 <- list() 
@@ -1593,13 +1666,13 @@ plot_fci_fnc <- function(x, y, z, xcivar, ycivar, zcivar, dataf, LCol, LWd, Fci.
   #Add text names
   if(Straight.Line == "Yes") {
     for (i in 1:length(ctrs)) {
-      lines(ci_p[[i]][, "x"], ci_p[[i]][, "y"], lty=i, col= my_clr[i], lwd=LWd)
+      lines(ci_p[[i]][, "x"], ci_p[[i]][, "y"], lty= line_type[i], col= my_clr[i], lwd=LWd)
       text(ci_p[[i]][1, "x"], ci_p[[i]][1, "y"], ctrs[i], cex= Text.Size, col=my_clr[i])
       text(ci_p[[i]][nrow(ci_p[[i]]), "x"], ci_p[[i]][nrow(ci_p[[i]]), "y"], ctrs[i], cex= Text.Size, col=my_clr[i])
     }
   } else {
     for (i in 1:length(ctrs)) {
-      lines(ci_p[[i]][, "x"], ci_p[[i]][, "y_p"], lty=i, col= my_clr[i], lwd=LWd)
+      lines(ci_p[[i]][, "x"], ci_p[[i]][, "y_p"], lty= line_type[i], col= my_clr[i], lwd=LWd)
       text(ci_p[[i]][1, "x"], ci_p[[i]][1, "y_p"], ctrs[i], cex= Text.Size, 
            col=my_clr[i])
       text(ci_p[[i]][nrow(ci_p[[i]]), "x"], ci_p[[i]][nrow(ci_p[[i]]), "y_p"], ctrs[i], cex= Text.Size, 
@@ -1673,7 +1746,7 @@ plot_fci <- reactive({                  #This indicates the data frame I will us
                  ci_p_tot=fci_tot_fac()$ci_p, ci_l_tot=fci_tot_fac()$ci_l, ci_u_tot=fci_tot_fac()$ci_u,
                  Tot.Color=fci_plot_Overall_Line_Colors(), Tgt.Color=fci_plot_Target_Line_Colors(), 
                  Tpt.Color=fci_plot_Time_Point_Line_Colors(), T3.Line.Width=fci_plot_targ_time_Line_Wd(), 
-                 Text.Size= fci_plot_text_label_size())
+                 Text.Size= fci_plot_text_label_size(), LType=fci_plot_group_line_type(), labMulti=FCI_plot_label_multiplier() )
   }
 })
 
@@ -1756,7 +1829,7 @@ fci_plot_Line_Colors <- reactive({
 
 #Select line width
 output$fci_plot_ln_wdth <- renderUI({                                 
-  numericInput("fciPltLnWd", "10. Select the group line width.", 
+  numericInput("fciPltLnWd", "11. Select the group line width.", 
                value = 2, min=0, step = 1)     
 })
 #Reactive function for directly above
@@ -1766,9 +1839,19 @@ fci_plot_Line_Width <- reactive({
 
 #Select how many knots I want
 output$FCI_nk_knots <- renderUI({                                
-  numericInput("FciNkKnots", "12. Select the number of spline knots.",
+  numericInput("FciNkKnots", "22. Select the number of spline knots.",
                value = 3, min=3, max = 10, step = 1)
 })
+#Select label size multiplier
+output$FCI_plot_lab_multi <- renderUI({                                 
+  numericInput("fciPltLabMlt", "23. Increase XY label sizes.",
+               value = 1, min=.01, step = .1)
+})
+#Reactive function for directly above
+FCI_plot_label_multiplier <- reactive({                 
+  input$fciPltLabMlt 
+})
+
 #Select whether to run the 95% confidence interval or not
 output$FCi_create <- renderUI({                                
   selectInput("FCiCreate", "20. Create the time plot?",
@@ -1818,7 +1901,6 @@ range_fycivar <- reactive({
 #13. Indicate if you want a straight line
 output$FCi_strght_ln <- renderUI({                                
   selectInput("fciStrtLn", "21. Use straight trend lines?",
-              #              choices = c("No", "Yes"),
               choices = c("No", "Yes", "Yes: Aggregated data only"),
               selected="No")
 })
@@ -1828,7 +1910,7 @@ fCi_straight_line <- reactive({
 })
 #Select target and time line width
 output$fci_plot_TgtTpt_ln_wdth <- renderUI({                                 
-  numericInput("fciPlTgTpLnWd", "11. Select other line's width.", 
+  numericInput("fciPlTgTpLnWd", "12. Select other line's width.", 
                value = 2, min=0, step = 1)     
 })
 #Reactive function for directly above
@@ -1874,24 +1956,33 @@ fci_plot_text_label_size <- reactive({
 })
 #14. Indicate lower limit of x-axis
 output$FCI__Xlim1 <- renderUI({
-  numericInput("fCiXLim1", "22. Lower X-axis limit.",
+  numericInput("fCiXLim1", "24. Lower X-axis limit.",
                value = range_fzcivar()[1], step = 1)
 })
 #15. Indicate upper limit of x-axis
 output$FCI__Xlim2 <- renderUI({
-  numericInput("fCiXLim2", "23. Upper X-axis limit.",
+  numericInput("fCiXLim2", "25. Upper X-axis limit.",
                value = if(fci_Z_Increment() ==1) { range_fzcivar()[2] } else {ceiling(range_fzcivar()[2]/fci_Z_Increment() ) } , 
                step = 1)
 })
 #16. Indicate lower limit of y-axis
 output$FCI__Ylim1 <- renderUI({
-  numericInput("fCiYLim1", "24. Lower Y-axis limit.",
+  numericInput("fCiYLim1", "26. Lower Y-axis limit.",
                value = range_fycivar()[1], step = .1)
 })
 #17. Indicate upper limit of x-axis
 output$FCI__Ylim2 <- renderUI({
-  numericInput("fCiYLim2", "25. Upper Y-axis limit.",
+  numericInput("fCiYLim2", "27. Upper Y-axis limit.",
                value = range_fycivar()[2], step = .1)
+})
+#Add a target line
+output$fci_plot_ln_typ <- renderUI({                                 
+  textInput("fciPltLnTyp", "10. Change the group line type.",
+            value = paste0('c( ', ')') )
+})
+#Reactive function for directly above
+fci_plot_group_line_type <- reactive({                 
+  input$fciPltLnTyp 
 })
 
 #Confidence interval plot for time
@@ -2021,8 +2112,8 @@ Scatter_Cor_Test_Conf_Int <- reactive({
 #6. Exact method
 output$scatter_cor_test_exct <- renderUI({  
   textInput("sctrCrtstEM", "6. Use the exact method?", 
-  #            choices = c("",TRUE, FALSE), multiple=FALSE, selected="")     
-  value = NULL)
+            #            choices = c("",TRUE, FALSE), multiple=FALSE, selected="")     
+            value = NULL)
 })
 #6A. Reactive function for Exact method
 Scatter_Cor_Test_Exact_Method <- reactive({
@@ -2037,26 +2128,46 @@ output$scatter_cor_test_cnt <- renderUI({
 Scatter_Cor_Test_Cont_Correct <- reactive({
   input$sctrCrtstCC
 })
-#8. Line color
-output$sctr_crtst_clr <- renderUI({                                
-  selectInput("sctrCrtstClr", "8. Select the plot's line color.",        
-              choices = xyplot_Line_Color_Names(), 
-              multiple=FALSE, selected="red" ) 
+#8. Exact method
+output$scatter_cor_regression_add_YN <- renderUI({  
+  selectInput("sctrRgrLnYN", "8. Add the regression line?", 
+              choices = c("No", "Yes"), multiple=FALSE, selected="No")     
 })
-#8A. Reactive function for alternative hypothesis test
+#8A. Reactive function for Exact method
+Scatter_Cor_Regression_Line_Yes_No <- reactive({
+  input$sctrRgrLnYN
+})
+#9. Line color
+output$sctr_crtst_clr <- renderUI({                                
+  selectInput("sctrCrtstClr", "9. Select the line color(s).",        
+              choices = xyplot_Line_Color_Names(), 
+              multiple=TRUE, selected=xyplot_Line_Color_Names()[c(1,5)] ) 
+})
+#9A. Reactive function for alternative hypothesis test
 scatter_cor_line_color <- reactive({
   input$sctrCrtstClr
 })
-#9. Exact method
+output$scatter_cor_lgd_loc <- renderUI({                                
+  selectInput("sctrCorLgdLoc", "10. Select the legend location.",        
+              choices = c("bottomright","bottom","bottomleft","left","topleft","top","topright","right","center"), 
+              multiple=FALSE, selected="topleft" ) 
+})
+#10A. Reactive function for legend location
+scatter_cor_legend_location <- reactive({
+  input$sctrCorLgdLoc
+})
+
+#11. Exact method
 output$scatter_cor_test_run_YN <- renderUI({  
-  selectInput("sctrCrtstYN", "9. Run the correlation and plot?", 
+  selectInput("sctrCrtstYN", "11. Run the correlation and plot?", 
               choices = c("No", "Yes"), multiple=FALSE, selected="No")     
 })
-#9A. Reactive function for Exact method
+#11A. Reactive function for Exact method
 Scatter_Cor_Test_Run_Yes_No <- reactive({
   input$sctrCrtstYN
 })
-#10. Run the function below
+
+#12. Run the function below
 scatter_cor_test_cor_run <- reactive({
   if(Scatter_Cor_Test_Run_Yes_No() == "Yes") {    
     fncSctrPltCr(DF=df(), X=scatter_cor_test_x(), Y=scatter_cor_test_y(), 
@@ -2070,21 +2181,22 @@ scatter_cor_test_cor_run <- reactive({
     )
   }  
 })
-#10A.Correlation test output  
+#12A.Correlation test output  
 output$scatter_cor_test_cor_test_out <- renderPrint({
   if(Scatter_Cor_Test_Run_Yes_No() == "Yes") {
     scatter_cor_test_cor_run()
   }
 })
-#11. Run the function below
+#13. Run the function below
 scatter_cor_test_plt_run <- reactive({
   if(Scatter_Cor_Test_Run_Yes_No() == "Yes") {    
     fncSctrPlt(DF=df(), X=scatter_cor_test_x(), Y=scatter_cor_test_y(), 
-                 sct_plt_clr=scatter_cor_line_color(), CT=scatter_cor_test_cor_run()
+               sct_plt_clr=scatter_cor_line_color(), CT=scatter_cor_test_cor_run(), 
+               Add.Reg=Scatter_Cor_Regression_Line_Yes_No() , Leg.Loc= scatter_cor_legend_location()
     )
   }  
 })
-#11A.Scatter plot  
+#13A.Scatter plot  
 output$scatter_cor_test_plt_out <- renderPlot({
   if(Scatter_Cor_Test_Run_Yes_No() == "Yes") {
     scatter_cor_test_plt_run()
@@ -2100,7 +2212,7 @@ fncSctrPltCr <- function(DF, X, Y,
                          sct_plt_exct, 
                          sct_plt_ci_lv, 
                          sct_plt_cont
-                         ) {
+) {
   #Correlation test
   CT <- cor.test(x=DF[, X], y=DF[, Y], alternative = sct_plt_alt,
                  method = sct_plt_meth, 
@@ -2113,13 +2225,37 @@ fncSctrPltCr <- function(DF, X, Y,
 ##################################
 ## Function to get scatter plot ##
 ##################################
-fncSctrPlt <- function(DF, X, Y, sct_plt_clr, CT) {
+fncSctrPlt <- function(DF, X, Y, sct_plt_clr, CT, Add.Reg, Leg.Loc) {
+  #Regression results
+  if(Add.Reg =="Yes") {
+    mod_fit_1 <- lm(DF[, Y] ~ DF[, X], data=DF)
+  }
+  #Title
+  if(Add.Reg =="No") {
+    Main.title <- paste0("Correlation of ", Y, " on ", X, " (R = ", round(as.numeric(CT["estimate"]), 3), 
+                         ", ", "p-value= ", try(round(as.numeric(CT["p.value"]), 4)), ")")
+  } else {
+    Main.title <- paste0("Correlation of ", Y, " on ", X, " (R= ", round(as.numeric(CT["estimate"]), 3), 
+                         ", ", "p-value= ", try(round(as.numeric(CT["p.value"]), 4)), 
+                         ", Int.= ", try(round(as.numeric(mod_fit_1$coefficients[1]), 3)), 
+                         ", Slope= ", try(round(as.numeric(mod_fit_1$coefficients[2]), 3)), ")" )
+  }
+  
   #Scatter plot
-  scatter.smooth(DF[, X], DF[, Y] , main= paste0("Correlation of ", Y, " on ", X, 
-                                                 " (correlation= ", round(as.numeric(CT["estimate"]), 3), 
-                                                 ", ", "p-value= ", try(round(as.numeric(CT["p.value"]), 4)), ")"),
-                 xlab=X, ylab=Y,
+  scatter.smooth(DF[, X], DF[, Y] , main= Main.title, xlab=X, ylab=Y,
                  lpars =list(col = sct_plt_clr, lwd = 5, lty = 3))
+  #Add regression line
+  if(Add.Reg =="Yes") {
+    abline(lm(DF[, Y] ~ DF[, X], data=DF), col= sct_plt_clr[2], lty=1, lwd= 5)
+  }
+  #Add Loess and regression trend lines
+  if(Add.Reg =="Yes") {
+    legend(Leg.Loc, legend=c("Loess trend","Regression trend"), col=sct_plt_clr[1:2],  #Leg.Loc sct_plt_clr
+           lty= c(1,3), lwd= 2.5, cex = 2, bty="n", inset=c(0, .05))
+  } else {
+    legend(Leg.Loc, legend=c("Loess trend"), col=sct_plt_clr[1],  #Leg.Loc sct_plt_clr
+           lty= 3, lwd= 2.5, cex = 2, bty="n", inset=c(0, .05))
+  }
 }
 
 ##########################################################################
@@ -2534,6 +2670,17 @@ density_group_trend_outcome <- reactive({
 density_group_trend_Y_density <- reactive({
   density(df()[, density_group_trend_outcome()], na.rm=TRUE) 
 })
+
+#3. Indicate if you want to run the trend function
+output$dnsty_grp_bgn_yesno <- renderUI({                                 
+  selectInput("dnsGrpBgnYN", "3. Begin grouping?", 
+              choices = c("No", "Yes"), multiple=FALSE, selected="No")     
+})
+#3A. Object for yes/no running of the plot 
+density_group_begin_yes_no <- reactive({
+  input$dnsGrpBgnYN
+})
+
 #2. Select the grouping variable.
 output$dnsty_grp_trnd_Xvar <- renderUI({
   selectInput("dnsGrpTrnX", "2. Select the group factor.",
@@ -2548,142 +2695,152 @@ density_group_trend_group <- reactive({
 density_group_trend_grp_levels <- reactive({
   unique(df()[, density_group_trend_group()])
 })
-#3. Select the specific groups.
+#4. Select the specific groups.
 output$dnsty_grp_trnd_Xlevs <- renderUI({
-  selectInput("dnsGrpTrXlev", "3. Select specific groups.",
-              choices = sort(density_group_trend_grp_levels()), multiple=TRUE)
+  if(density_group_begin_yes_no() == "Yes") {
+    selectInput("dnsGrpTrXlev", "4. Select specific groups.",
+                choices = sort(density_group_trend_grp_levels()), multiple=TRUE)
+  } else {
+    selectInput("dnsGrpTrXlev", "4. Select specific groups.",
+                choices = "NA", multiple=TRUE, selected= "NA" )     
+  }
 })
-#3A. Reactive function for the variable
+#4A. Reactive function for the variable
 density_group_trend_grp_X_levs <- reactive({
   input$dnsGrpTrXlev
 })
-#4. Select the time indicator.
+#5. Select the time indicator.
 output$dnsty_grp_trnd_Zvar <- renderUI({ 
-  selectInput("dnsGrpTrnZ", "4. Select the time indicator.", 
+  selectInput("dnsGrpTrnZ", "5. Select the time indicator.", 
               choices = setdiff(var(), c(density_group_trend_outcome(), density_group_trend_group() ) ), 
               multiple=FALSE, selected= setdiff(var(), c(density_group_trend_outcome(), density_group_trend_group() ) )[1])
 })
-#4A. Reactive function for the variable
+#5A. Reactive function for the variable
 density_group_trend_time <- reactive({
   input$dnsGrpTrnZ
 })
-#4B. Reactive function for the range of time
+#5B. Reactive function for the range of time
 density_group_trend_range_time <- reactive({
   range(as.numeric(df()[, density_group_trend_time()]), na.rm=TRUE)
 })
-#5. Select the rolling time period 
+#6. Select the rolling time period 
 output$dnsty_grp_trnd_Z_inc <- renderUI({                                 
-  numericInput("dnsGrpTrnZInc", "5. Select time increments (3= 3 months).", 
+  numericInput("dnsGrpTrnZInc", "6. Select time increments (3= 3 months).", 
                value = 1, step = 1)     
 })
-#5A. Reactive function for the variable
+#6A. Reactive function for the variable
 density_group_trend_Time_Increment <- reactive({
   input$dnsGrpTrnZInc
 })
-#6. Line color
+#7. Line color
 output$dnsty_grp_trnd_ln_clr <- renderUI({                                
-  selectInput("dnsGrpTrnLClr", "6. Select the line color.",        
+  selectInput("dnsGrpTrnLClr", "7. Select the line color.",        
               choices = xyplot_Line_Color_Names(), 
               multiple=FALSE, selected="red" ) 
 })
-#6A. Reactive function for line color
+#7A. Reactive function for line color
 density_group_trend_line_color <- reactive({
   input$dnsGrpTrnLClr
 })
-#7. Select the rolling time period 
+#10. Select the rolling time period 
 output$dnsty_grp_trnd_trgt <- renderUI({                                 
-  numericInput("dnsGrpTrnTrgt", "7. Set a target.", 
+  numericInput("dnsGrpTrnTrgt", "10. Set a target.", 
                value = NULL, step = .01)     
 })
-#7A. Reactive function for the variable
+#10A. Reactive function for the variable
 density_group_trend_Target <- reactive({
   input$dnsGrpTrnTrgt
 })
-#8. Legend location
+#11. Legend location
 output$dnsty_grp_trnd_lgd_loc <- renderUI({                                
-  selectInput("dnsGrpTrnLgdLoc", "8. Select the legend location.",        
+  selectInput("dnsGrpTrnLgdLoc", "11. Select the legend location.",        
               choices = c("bottomright","bottom","bottomleft","left","topleft","top","topright","right","center"), 
               multiple=FALSE, selected="topleft" ) 
 })
-#8A. Reactive function for legend location
+#11A. Reactive function for legend location
 density_group_trend_legend_location <- reactive({
   input$dnsGrpTrnLgdLoc
 })
-#9. Set the seed 
+#12. Set the seed 
 output$dnsty_grp_trnd_st_sed <- renderUI({                                 
-  numericInput("dnsGrpTrnStSd", "9. Set (seed) group name randomness.", 
+  numericInput("dnsGrpTrnStSd", "12. Set (seed) group name randomness.", 
                value = 1, step = 1, min=1)     
 })
-#9A. Reactive function for the variable
+#12A. Reactive function for the variable
 density_group_trend_set_seed <- reactive({
   input$dnsGrpTrnStSd
 })
-#10. Indicate if you want to run the trend function
+#13. Indicate if you want to run the trend function
 output$dnsty_grp_trnd_run_yesno <- renderUI({                                 
-  selectInput("dnsGrpTrnRunYN", "10. Run the trend?", 
+  selectInput("dnsGrpTrnRunYN", "13. Run the trend?", 
               choices = c("No", "Yes"), multiple=FALSE, selected="No")     
 })
-#10A. Object for yes/no running of the plot 
+#13A. Object for yes/no running of the plot 
 density_group_trend_run_yes_no <- reactive({
   input$dnsGrpTrnRunYN
 })
-#11. Speed of the animation play 
+#14. Speed of the animation play 
 output$dnsty_grp_trnd_sec <- renderUI({                                 
-  numericInput("dnsGrpTrnSec", "11. Play speed (1000= 1 second).", 
+  numericInput("dnsGrpTrnSec", "14. Play speed (1000= 1 second).", 
                value = 500, step = 100, min=0)     
 })
-#11A. Reactive function for the variable
+#14A. Reactive function for the variable
 density_group_trend_seconds <- reactive({
   input$dnsGrpTrnSec
 })
-#12. Play the trend graph
+#15. Play the trend graph
 output$dnsty_grp_trnd_ply <- renderUI({
-  sliderInput("dnsGrpTrnPly", "12. Play the time trend.",   
-              min= density_group_trend_range_time()[1], 
-              max= density_group_trend_range_time()[2] - (density_group_trend_Time_Increment() - 1), 
-              value =1, step=1, animate=list(interval= density_group_trend_seconds() ))  
+  if(density_group_begin_yes_no() == "Yes") {
+    sliderInput("dnsGrpTrnPly", "15. Play the time trend.",   
+                min= density_group_trend_range_time()[1], 
+                max= density_group_trend_range_time()[2] - (density_group_trend_Time_Increment() - 1), 
+                value =1, step=1, animate=list(interval= density_group_trend_seconds() ))  
+  } else {
+    sliderInput("dnsGrpTrnPly", "15. Play the time trend.",   
+                min= 0, max= 1, value =0, step=1 )
+  }
 })
-#12A. Reactive function for the variable
+#15A. Reactive function for the variable
 density_group_trend_play <- reactive({
   input$dnsGrpTrnPly
 })
-#13. Indicate lower limit of x-axis
+#16. Indicate lower limit of x-axis
 output$dnsty_grp_trnd_Xlim1 <- renderUI({
-  numericInput("dnsGrpTrnX1", "13. Lower X-axis limit.",
+  numericInput("dnsGrpTrnX1", "16. Lower X-axis limit.",
                value = min(density_group_trend_Y_density()[["x"]], na.rm=TRUE), step = .1)
 })
-#13A. Reactive function for the variable
+#16A. Reactive function for the variable
 density_group_trend_Xlim1 <- reactive({
   input$dnsGrpTrnX1
 })
-#14. Indicate upper limit of x-axis
+#17. Indicate upper limit of x-axis
 output$dnsty_grp_trnd_Xlim2 <- renderUI({
-  numericInput("dnsGrpTrnX2", "14. Upper X-axis limit.",
+  numericInput("dnsGrpTrnX2", "17. Upper X-axis limit.",
                value = max(density_group_trend_Y_density()[["x"]], na.rm=TRUE), step = .1)
 })
-#14A. Reactive function for the variable
+#17A. Reactive function for the variable
 density_group_trend_Xlim2 <- reactive({
   input$dnsGrpTrnX2
 })
-#15. Indicate lower limit of y-axis
+#18. Indicate lower limit of y-axis
 output$dnsty_grp_trnd_Ylim1 <- renderUI({
-  numericInput("dnsGrpTrnY1", "15. Lower Y-axis limit.",
+  numericInput("dnsGrpTrnY1", "18. Lower Y-axis limit.",
                value = min(density_group_trend_Y_density()[["y"]], na.rm=TRUE), step = .1)
 })
-#15A. Reactive function for the variable
+#18A. Reactive function for the variable
 density_group_trend_Ylim1 <- reactive({
   input$dnsGrpTrnY1
 })
-#16. Indicate upper limit of Y-axis
+#19. Indicate upper limit of Y-axis
 output$dnsty_grp_trnd_Ylim2 <- renderUI({
-  numericInput("dnsGrpTrnY2", "16. Upper Y-axis limit.",
+  numericInput("dnsGrpTrnY2", "19. Upper Y-axis limit.",
                value = max(density_group_trend_Y_density()[["y"]], na.rm=TRUE), step = .1)
 })
-#16A. Reactive function for the variable
+#19A. Reactive function for the variable
 density_group_trend_Ylim2 <- reactive({
   input$dnsGrpTrnY2
 })
-#17. Run trend output function below  
+#20. Run trend output function below  
 density_group_trend_output <- reactive({
   if(density_group_trend_run_yes_no() == "Yes") {    
     fncTmDnsty(DF=df(), X= density_group_trend_group(), Y= density_group_trend_outcome(), 
@@ -2691,7 +2848,36 @@ density_group_trend_output <- reactive({
                Seed.Multiplier= density_group_trend_set_seed() )
   }  
 })
-#18. Plot function below  
+#8. Select group label colors
+output$dns_plot_lbl_clrs <- renderUI({                                 
+  if(density_group_begin_yes_no() == "Yes") {
+    selectInput("dnsPltLblClr", "8. Select group label colors.", 
+                choices = xyplot_Line_Color_Names(), multiple=TRUE, 
+                selected= xyplot_Line_Color_Names()[1:length(density_plot_groups())] )     
+  } else {
+    selectInput("dnsPltLblClr", "8. Select group label colors.", 
+                choices = NA, multiple=TRUE, selected= NA )     
+  }  
+})
+#9. Select the line label size
+output$dns_plot_txt_lbl_sz <- renderUI({                                 
+  numericInput("dnsPlTxtLblSz", "9. Select the group label size.", 
+               value = 2, min=0, step = .1)     
+})
+#9A. Reactive function for directly above
+dns_plot_text_label_size <- reactive({                 
+  input$dnsPlTxtLblSz 
+})
+#Reactive function for directly above
+density_plot_Label_Colors <- reactive({                 
+  input$dnsPltLblClr 
+})
+#Reactive function to get group levels
+density_plot_groups <- reactive({                 
+  unique(df()[, density_group_trend_group()]) 
+})
+
+#21. Plot function below  
 density_group_trend_plot <- reactive({
   if(density_group_trend_run_yes_no() == "Yes") {    
     fncTmDnstPlot(TDList= density_group_trend_output(), X= density_group_trend_group(), 
@@ -2700,23 +2886,25 @@ density_group_trend_plot <- reactive({
                   Target= density_group_trend_Target(), Groups= density_group_trend_grp_X_levs(), 
                   Legend.Loc= density_group_trend_legend_location(), 
                   Xmin=density_group_trend_Xlim1(), Xmax=density_group_trend_Xlim2(), 
-                  Ymin=density_group_trend_Ylim1(), Ymax= density_group_trend_Ylim2()) 
+                  Ymin=density_group_trend_Ylim1(), Ymax= density_group_trend_Ylim2(),
+                  GCol=density_plot_Label_Colors(), Text.Size=dns_plot_text_label_size(),
+                  Period.Range=density_group_trend_range_time()) 
   }  
 })
-#18A. Trend plot  
+#21A. Trend plot  
 output$dnsty_grp_trnd_plot <- renderPlot({
   if(density_group_trend_run_yes_no() == "Yes") {
     density_group_trend_plot()
   }
 })
-#19. Each period's output  
+#22. Each period's output  
 density_group_trend_by_time <- reactive({
   if(density_group_trend_run_yes_no() == "Yes") {    
     fncTmDnstOut(TDList= density_group_trend_output(), 
-                 Period=density_group_trend_play(), Target= density_group_trend_Target())  
+                 Period=density_group_trend_play(), Target= density_group_trend_Target(), Period.Range=density_group_trend_range_time())  
   }  
 })
-#19A. Each period's output  
+#22A. Each period's output  
 output$dnsty_grp_trnd_out_by_tm <- renderPrint({
   if(density_group_trend_run_yes_no() == "Yes") {    
     density_group_trend_by_time()
@@ -2801,19 +2989,23 @@ fncTmDnsty <- function(DF, X, Y, Z, Increment, Seed.Multiplier) {
 ##    Function to Plot density of aggregated values  over time increments     ##
 ################################################################################
 fncTmDnstPlot <- function(TDList, X, Y, Z, Period, Lcol, Target, Groups,
-                          Legend.Loc,Xmin, Xmax, Ymin, Ymax) {
+                          Legend.Loc,Xmin, Xmax, Ymin, Ymax, GCol, Text.Size, Period.Range) {
+  #Full range of periods to use in case I get a year variable
+  Full.Range <- seq(Period.Range[1], Period.Range[2], by=1 )
+  #Colors
+  my_clr <- GCol
   Increment.Length <- TDList[["Increment.Length"]]
   #Title
   if(TDList[["Increment"]] == 1) {
     Main.Title <- paste(Y," rate by ", Z, ": ", 
-                        TDList[["Time.Start.Label"]][[Period]],  sep= "")
+                        TDList[["Time.Start.Label"]][[which(Full.Range == Period)]],  sep= "")
   } else {
     Main.Title <- paste(Y," rate by ", Z, ": ", 
-                        TDList[["Time.Start.Label"]][[Period]], " - ",                      
-                        TDList[["Time.Stop.Label"]][[Period]],  sep= "")
+                        TDList[["Time.Start.Label"]][[which(Full.Range == Period)]], " - ",                      
+                        TDList[["Time.Stop.Label"]][[which(Full.Range == Period)]],  sep= "")
   }
   #Density plot
-  plot(TDList[["D2"]][[ Period]], xlim=c(Xmin,Xmax), ylim= c(Ymin, Ymax),  
+  plot(TDList[["D2"]][[ which(Full.Range == Period)]], xlim=c(Xmin,Xmax), ylim= c(Ymin, Ymax),  
        col=Lcol, lwd=8  ,
        main=Main.Title, xlab= "Rate" 
   )
@@ -2822,21 +3014,21 @@ fncTmDnstPlot <- function(TDList, X, Y, Z, Period, Lcol, Target, Groups,
   abline(v= mean(TDList[["AggrY"]][[1]][[2]]), col=colors()[102], lwd=2)
   abline(v= mean(TDList[["AggrY"]][[Increment.Length]][[2]]), col=colors()[102], lwd=2, lty=2)
   ###Rug and text to identify the med centers.###
-  rug(TDList[["DYvals"]][[Period]], side=1, col=Lcol)
+  rug(TDList[["DYvals"]][[which(Full.Range == Period)]], side=1, col=Lcol)
   #Text for group values
   if ( is.null(Groups) ) {  
-    text(TDList[["DYvals"]][[Period]], unlist(TDList[["Dy.Cord.Random"]][Period]),   
-         labels= unlist(TDList[["DXname"]][[Period]][X]),
-         cex=2)
+    text(TDList[["DYvals"]][[which(Full.Range == Period)]], unlist(TDList[["Dy.Cord.Random"]][which(Full.Range == Period)]),   
+         labels= unlist(TDList[["DXname"]][[which(Full.Range == Period)]][X]),
+         cex=Text.Size, col=my_clr )
   } else {
-    non_groups <- setdiff(unlist(TDList[["DXname"]][[Period]][[X]]) , Groups)   #Get excluded groups
-    Groups.Temp <- as.character(unlist(TDList[["DXname"]][[Period]][[X]]))      #Get all groups
+    non_groups <- setdiff(unlist(TDList[["DXname"]][[which(Full.Range == Period)]][[X]]) , Groups)   #Get excluded groups
+    Groups.Temp <- as.character(unlist(TDList[["DXname"]][[which(Full.Range == Period)]][[X]]))      #Get all groups
     Groups.Temp[which(Groups.Temp %in% non_groups )] <- ""                      #Change non-groups to blanks
-    text(TDList[["DYvals"]][[Period]], unlist(TDList[["Dy.Cord.Random"]][Period]),   
-         labels= Groups.Temp, cex=2)
+    text(TDList[["DYvals"]][[which(Full.Range == Period)]], unlist(TDList[["Dy.Cord.Random"]][which(Full.Range == Period)]),   
+         labels= Groups.Temp, cex=Text.Size, col= my_clr)
   }
   ###Legend###
-  #This creates a legend for the ablines with and without targets. TDList[["AggrY"]][[Period]] YTmean
+  #This creates a legend for the ablines with and without targets. TDList[["AggrY"]][[which(Full.Range == Period)]] YTmean
   if ( !is.numeric(Target) ) {  
     legend(x=Legend.Loc, legend=c(paste0("Starting pooled mean: ", round(mean(TDList[["AggrY"]][[1]][[2]], na.rm=TRUE), 3)),
                                   paste0("Ending pooled mean: ", round(mean(TDList[["AggrY"]][[Increment.Length]][[2]], na.rm=TRUE), 3) )),
@@ -2844,9 +3036,9 @@ fncTmDnstPlot <- function(TDList, X, Y, Z, Period, Lcol, Target, Groups,
            lty= c(1,2,1), lwd= 1.5, cex = 1.5, bty="n", inset=c(0, .05))
   } else {  
     #legend(Legend.Loc, legend=c("Starting mean","Ending mean", "Target"),
-           legend(Legend.Loc, legend=c(paste0("Starting pooled mean: ", round(mean(TDList[["AggrY"]][[1]][[2]], na.rm=TRUE), 3)),
-                                       paste0("Ending pooled mean: ", round(mean(TDList[["AggrY"]][[Increment.Length]][[2]], na.rm=TRUE), 3) ) , 
-                                       paste0("Target: ", Target)),
+    legend(Legend.Loc, legend=c(paste0("Starting pooled mean: ", round(mean(TDList[["AggrY"]][[1]][[2]], na.rm=TRUE), 3)),
+                                paste0("Ending pooled mean: ", round(mean(TDList[["AggrY"]][[Increment.Length]][[2]], na.rm=TRUE), 3) ) , 
+                                paste0("Target: ", Target)),
            col=c(colors()[102], colors()[102], "blue"),
            lty= c(1,2,1), lwd= 1.5, cex = 1.5, bty="n", inset=c(0, .05))
   }
@@ -2855,8 +3047,9 @@ fncTmDnstPlot <- function(TDList, X, Y, Z, Period, Lcol, Target, Groups,
 ################################################################################
 ##           Function to get aggregated values over time increments           ##
 ################################################################################
-fncTmDnstOut <- function(TDList, Period, Target) {
-  out.by.period <- TDList[["AggrY"]][[Period]]
+fncTmDnstOut <- function(TDList, Period, Target, Period.Range) {
+  Full.Range <- seq(Period.Range[1], Period.Range[2], by=1 )
+  out.by.period <- TDList[["AggrY"]][[ which(Full.Range == Period)]]
   
   #High Target
   HT.table <- vector(length=2)
@@ -2886,8 +3079,6 @@ fncTmDnstOut <- function(TDList, Period, Target) {
               "Pooled.Mean"= mean(as.numeric(unlist(out.by.period[[2]])) ,na.rm=TRUE),
               "Pooled.Median"= median(as.numeric(unlist(out.by.period[[2]])) ,na.rm=TRUE)))
 }
-
-
 
 ################################################################################
 
