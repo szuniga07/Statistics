@@ -19,6 +19,8 @@ from scipy.stats import norm
 from scipy.stats import kstest
 import scipy.stats as stats
 
+#pip install numpy
+import numpy as np
 
 ## Make a folder location so that you can load and save files:
 
@@ -171,7 +173,7 @@ plt.scatter(hosprog['los'], hosprog['survey'])
 #3. Weak negative correlation between LOS and age   but statistically significant
 r_coef, p_value = stats.pearsonr(hosprog['los'], hosprog['age'])
 print(f"Pearson Coefficient: {r_coef}, P-value: {p_value}")
-plt.scatter(hosprog['los'], hosprog['age'])
+plt.scatter( hosprog['age'], hosprog['los'],)
 
 # You can do point-biseral correlations which are correlations 
 # between continuous and binary variables.

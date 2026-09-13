@@ -182,8 +182,8 @@ plot(hosprog$los, hosprog$survey, main= "LOS x Survey (strong -)",
 #3.
 cor3 <- cor.test(hosprog$los, hosprog$age, use = "complete.obs",
                  method = "pearson" )
-plot(hosprog$los, hosprog$age, main= "LOS x Age (weak -)",
-     xlab= "LOS", ylab= "Age", col="slateblue",
+plot(hosprog$age, hosprog$los, main= "LOS x Age (weak -)",
+     xlab= "Age", ylab= "LOS", col="slateblue",
      sub= paste("Correlation= ", round(cor3$estimate, 3), #paste text &
                 "p= ", round(cor3$p.value, 3)) )  # numbers for subtitle
 #4.
@@ -204,6 +204,7 @@ par(mfrow= c(1, 1))
 ########################
 hos_cor <- cor(hosprog[, c("survey", "los","cost","rdm30","death30","female","age")],
                use = "complete.obs", method = "pearson")
+hos_cor  #too crowded so I'll limit it to 2 decimal places below
 print(hos_cor, digits=2)
 # digits=2 is the number of significant digits, not rounding digits
 
